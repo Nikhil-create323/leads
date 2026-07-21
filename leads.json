@@ -1,0 +1,1232 @@
+{
+  "name": "leads",
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={\n  \"system_prompt\": \"You are the Intelligent Lead Evaluation & Outreach Agent. Your task has two stages:\\n\\nSTAGE 1: LEAD QUALIFICATION & VECTOR MATCHING\\n1. Take the text provided in the 'Requirements' field below and use your vector database tool to query it.\\n2. From the tool's response, extract exactly the top 2 best-matching vector documents and their corresponding confidence/similarity scores.\\n3. Analyze the incoming lead against the ICP Qualification rules retrieved from the vector database.\\n STAGE 2: EMAIL GENERATION (ONLY IF QUALIFIED)\\nIF the lead is qualified, generate a personalized cold email based on the best-matched vector context. If disqualified, DO NOT generate an email.\\n\\nREQUIRED OUTPUT FORMAT:\\nYou must format your final output strictly as a valid JSON object matching this structure:\\n{\\n  \\\"qualification\\\": \\\"qualified\\\" or \\\"disqualified\\\",\\n  \\\"reasoning\\\": \\\"[one-sentence explanation]\\\",\\n  \\\"top_matches\\\": [\\n    {\\n      \\\"rank\\\": 1,\\n      \\\"content\\\": \\\"[Brief snippet of the 1st best matching vector text]\\\",\\n      \\\"confidence_score\\\": \\\"[Insert score here, e.g., 0.89]\\\"\\n    },\\n    {\\n      \\\"rank\\\": 2,\\n      \\\"content\\\": \\\"[Brief snippet of the 2nd best matching vector text]\\\",\\n      \\\"confidence_score\\\": \\\"[Insert score here, e.g., 0.74]\\\"\\n    }\\n  ],\\n  \\\"email\\\": {\\n    \\\"subject\\\": \\\"[personalized subject or null if disqualified]\\\",\\n    \\\"body\\\": \\\"[personalized email body or null if disqualified]\\\"\\n  }\\n}\\n\\nLead Data to process:\\nEmail:{{ $json['current lead in flow'].email }}\\nCompany: {{ $json['current lead in flow'].company }}\\nRequirements: {{ $json['current lead in flow'].requirements }}\\n\\nRemember:\\n- You MUST output valid raw JSON only so it can be parsed by subsequent workflow nodes.\\n- Never invent confidence scores; use the exact scores returned by the vector tool connection.\"\n}",
+        "options": {
+          "maxIterations": 5,
+          "batching": {
+            "batchSize": 1
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -1216,
+        -1104
+      ],
+      "id": "086b5f5a-3123-4622-9659-ae0062453545",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": "llama-3.3-70b-versatile",
+        "options": {
+          "maxTokensToSample": 1500,
+          "temperature": 0.7
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -1280,
+        -880
+      ],
+      "id": "e2e83b82-43c6-450e-9424-a53c9829bec3",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "kCtDDAmMnWQXmMfQ",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "Use this tool to look up technical specifications, system prompts, core purposes, and architecture parameters for the AutoCRM system agents.",
+        "pineconeIndex": {
+          "__rl": true,
+          "value": "myindex",
+          "mode": "list",
+          "cachedResultName": "myindex"
+        },
+        "topK": 2,
+        "includeDocumentMetadata": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1.3,
+      "position": [
+        -1024,
+        -880
+      ],
+      "id": "71dfffc4-d9d1-4116-91f0-56094a4be49c",
+      "name": "Pinecone Vector Store",
+      "credentials": {
+        "pineconeApi": {
+          "id": "5cBaRWRCWfdUqaAW",
+          "name": "Pinecone account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "=nomic-embed-text"
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOllama",
+      "typeVersion": 1,
+      "position": [
+        -944,
+        -672
+      ],
+      "id": "6b5ad497-393c-4ed1-bf05-6a471df66dbe",
+      "name": "Embeddings Ollama",
+      "credentials": {
+        "ollamaApi": {
+          "id": "ylNWveQw3edvA6cR",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "015d9b7b-a93a-4ec1-8f90-89874bd2a708",
+              "leftValue": "={{ $json.qualification }}",
+              "rightValue": "qualified",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -464,
+        -656
+      ],
+      "id": "dc7e78a6-b8c0-46bd-9f8d-605c7aaebd1e",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "triggerOn": "specificFolder",
+        "folderToWatch": {
+          "__rl": true,
+          "value": "10me-7pI6NimjC0a9Ef2L9epkTSyuddNT",
+          "mode": "list",
+          "cachedResultName": "agents_detail",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/10me-7pI6NimjC0a9Ef2L9epkTSyuddNT"
+        },
+        "event": "fileUpdated",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDriveTrigger",
+      "typeVersion": 1,
+      "position": [
+        -2656,
+        -336
+      ],
+      "id": "236b4d3f-c965-4cf1-b351-db7cdbf80248",
+      "name": "Google Drive Trigger",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "DZ2iS0qfAVgkv0rG",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('pop_lead').item.json['current lead in flow'].email }}",
+        "subject": "={{ $('parse_agent_response').item.json.email.subject }}",
+        "emailType": "text",
+        "message": "={{ $('parse_agent_response').item.json.email.body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -208,
+        -992
+      ],
+      "id": "3df26958-b7dd-46d9-a6fa-5db2c29b7ad1",
+      "name": "Send a message",
+      "webhookId": "7e6dff3a-aa9a-46cb-9cce-76bc0552b08b",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "iAQhR2gsMEsS39VR",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "agents",
+        "include": "allOtherFields",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -1984,
+        -336
+      ],
+      "id": "f615ec9c-9e82-48c3-8f9c-49740ea74804",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {
+          "binaryPropertyName": "data"
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -2432,
+        -336
+      ],
+      "id": "eaa7f120-f2c4-4c0e-ba05-c22bd656cbec",
+      "name": "Download file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "DZ2iS0qfAVgkv0rG",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Use n8n's built-in helper to safely extract the binary data as a text string\nconst rawText = await this.helpers.getBinaryDataBuffer(0, 'data').then(buf => buf.toString('utf-8'));\n\n// 2. Parse that clean string into a JSON array\nconst parsedJson = JSON.parse(rawText);\n\n// 3. Return it as a JSON key named 'agents' for your Split Out node\nreturn {\n  json: {\n    agents: parsedJson\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2208,
+        -336
+      ],
+      "id": "623089b0-cf76-4e5d-b8ca-cb7e9044f96a",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "formTitle": "details",
+        "formDescription": "enter your requirements",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "requirements",
+              "placeholder": "describe your need in 1-50 words.",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "email",
+              "fieldType": "email",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "company"
+            },
+            {
+              "fieldLabel": "mobile"
+            },
+            {
+              "fieldLabel": "source",
+              "placeholder": "how did you get to know about us"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [
+        -2752,
+        -1408
+      ],
+      "id": "8ac93fd5-9a4a-4eb7-8b55-398b350f2ad9",
+      "name": "On form submission",
+      "webhookId": "9576285b-6720-497a-883f-f55055499ee7"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract and trim lead data\nconst rawEmail = ($input.first().json.email || '').toString().trim();\nconst rawRequirements = ($input.first().json.requirements || '').toString().trim();\nconst rawCompany = ($input.first().json.company || '').toString().trim();\nconst rawMobile = ($input.first().json.mobile || '').toString().trim();\nconst rawSource = ($input.first().json.source || '').toString().trim();\n\nconst errors = [];\n\n// 1. Email validation (Basic regex check)\nconst emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\nif (!emailRegex.test(rawEmail)) {\n  errors.push(\"Invalid email format.\");\n}\n\n// 2. Requirements length check (< 600 characters after trimming)\nif (rawRequirements.length >= 600) {\n  errors.push(\"Requirements must be less than 600 characters.\");\n}\n\n// 3. Company name length check (< 50 characters)\nif (rawCompany.length >= 50) {\n  errors.push(\"Company name must be less than 50 characters.\");\n}\n\n// 4. Mobile number validation (Exactly 10 digits)\n// This strips away any accidental spaces/dashes first to just check the digits\nconst cleanMobile = rawMobile.replace(/\\D/g, ''); \nif (cleanMobile.length !== 10) {\n  errors.push(\"Mobile number must be a valid 10-digit number.\");\n}\n\n// 5. Source length check (< 30 characters)\nif (rawSource.length >= 30) {\n  errors.push(\"Source must be less than 30 characters.\");\n}\n\n// Return appropriate JSON based on validation results\nif (errors.length > 0) {\n  return {\n    \"status\": \"error\",\n    \"errors\": errors\n  };\n}\n\nreturn {\n  \"lead\": {\n    \"email\": rawEmail,\n    \"company\": rawCompany,\n    \"requirements\": rawRequirements,\n    \"mobile\": cleanMobile, // returns clean 10-digit string\n    \"source\": rawSource\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2448,
+        -1408
+      ],
+      "id": "3663be8b-6329-4965-b727-b5d937fbe6fc",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "recent leads"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        -1152,
+        -880
+      ],
+      "id": "2389925a-5fd9-4825-9d59-bc87e1ac11e8",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1wYRKcYLm7tkRq0XM-3XhGsPNPA2EJVhHEAU19o4M4AQ",
+          "mode": "list",
+          "cachedResultName": "leads",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1wYRKcYLm7tkRq0XM-3XhGsPNPA2EJVhHEAU19o4M4AQ/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1wYRKcYLm7tkRq0XM-3XhGsPNPA2EJVhHEAU19o4M4AQ/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "email": "={{ $('pop_lead').item.json['current lead in flow'].email }}",
+            "mobile": "={{ $('pop_lead').item.json['current lead in flow'].mobile }}",
+            "company": "={{ $('pop_lead').item.json['current lead in flow'].company }}",
+            "source": "={{ $('pop_lead').item.json['current lead in flow'].source }}",
+            "agent": "={{ $('parse_agent_response').item.json.top_matches[0].content }}",
+            "timestamp": "={{ $json.timeStamp }}"
+          },
+          "matchingColumns": [
+            "email"
+          ],
+          "schema": [
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "mobile",
+              "displayName": "mobile",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "company",
+              "displayName": "company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "agent",
+              "displayName": "agent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -208,
+        -768
+      ],
+      "id": "ab6b52ee-6045-4b27-b940-816d7c3518a9",
+      "name": "Append or update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YKY6QDHdMEb4hO6F",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds",
+              "secondsInterval": 50
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -2624,
+        -784
+      ],
+      "id": "673a0487-f295-4d9c-9c6f-5cf5aee0ee07",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -1408,
+        -576
+      ],
+      "id": "3a0046a8-462d-4fb5-b34c-3e5b148fbbb8",
+      "name": "No Operation, do nothing"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -2736,
+        -1168
+      ],
+      "id": "ccd31778-f179-4b6e-89a5-22540914837e",
+      "name": "Error Trigger"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -1952,
+        -880
+      ],
+      "id": "f49f663b-ffd7-4a5a-aac6-6ff28ee7a775",
+      "name": "No Operation, do nothing1"
+    },
+    {
+      "parameters": {
+        "operation": "pop",
+        "list": "leads",
+        "propertyName": "=current lead in flow",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -1872,
+        -688
+      ],
+      "id": "139991fe-8638-4f5d-b333-8eb24f2db697",
+      "name": "pop_lead",
+      "credentials": {
+        "redis": {
+          "id": "3vbZpmxpn6MpEUHP",
+          "name": "Redis account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "propertyName": "waiting",
+        "key": "is_waiting ",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -2400,
+        -784
+      ],
+      "id": "0645a9e4-0c9a-463b-bd89-2b362a891846",
+      "name": "get_waiting_status",
+      "credentials": {
+        "redis": {
+          "id": "3vbZpmxpn6MpEUHP",
+          "name": "Redis account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "is_waiting",
+        "value": "false"
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        304,
+        -832
+      ],
+      "id": "41063563-da4a-4834-bc44-09744b3676ba",
+      "name": "unset_waiting",
+      "credentials": {
+        "redis": {
+          "id": "3vbZpmxpn6MpEUHP",
+          "name": "Redis account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "285d8a22-a41e-4a28-bc0d-a66d19e03ecc",
+              "leftValue": "={{ $json.waiting }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -2176,
+        -784
+      ],
+      "id": "5211eb5b-424f-4314-90b7-5235a7157ef6",
+      "name": "waiting_status"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "be318531-3d2a-4958-9888-caa9ea6f0cd7",
+              "leftValue": "={{ $json['current lead in flow'] }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1664,
+        -688
+      ],
+      "id": "9aa903d5-3c17-455c-a719-cbeaeeef0878",
+      "name": "does_list_has_data"
+    },
+    {
+      "parameters": {
+        "operation": "push",
+        "list": "leads",
+        "messageData": "={{ JSON.stringify($json.lead) }}",
+        "tail": true
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -1824,
+        -1424
+      ],
+      "id": "191c73e2-1ef3-4878-a15c-1f14ebde128d",
+      "name": "push_lead",
+      "credentials": {
+        "redis": {
+          "id": "3vbZpmxpn6MpEUHP",
+          "name": "Redis account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const convertedJson = JSON.parse($input.first().json.output);\nconvertedJson[\"timeStamp\"] = new Date().toLocaleString();\nreturn convertedJson;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -688,
+        -1008
+      ],
+      "id": "1e610cc8-e9f6-4190-b318-f4985e119825",
+      "name": "parse_agent_response"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "54ca3f1c-1ab9-4572-8186-9ad9e29e3609",
+              "leftValue": "={{ $json.errors }}",
+              "rightValue": "null",
+              "operator": {
+                "type": "array",
+                "operation": "notExists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -2176,
+        -1408
+      ],
+      "id": "3bd6bad0-a115-4ca5-980c-f776808cb43d",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "is_waiting",
+        "value": "true"
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -1456,
+        -944
+      ],
+      "id": "ab2795a4-5335-47df-9e91-e00056e2ac3e",
+      "name": "set_waiting",
+      "credentials": {
+        "redis": {
+          "id": "3vbZpmxpn6MpEUHP",
+          "name": "Redis account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "bd7be50f-c44e-4735-a581-6b963059d469",
+              "leftValue": "={{ $('pop_lead').item.json['current lead in flow'].retryCount }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "notExists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "01b453bb-158c-4f63-9006-4fd7f39c8a89",
+              "leftValue": "={{ $('pop_lead').item.json['current lead in flow'].retryCount }}",
+              "rightValue": 5,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -208,
+        -528
+      ],
+      "id": "187b412f-d45d-47d3-b863-e5e5e3f8733f",
+      "name": "If2"
+    },
+    {
+      "parameters": {
+        "operation": "push",
+        "list": "leads",
+        "messageData": "={{ JSON.stringify($json.lead) }}"
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        96,
+        -608
+      ],
+      "id": "5e64deaf-45be-46e1-bdd8-4ef86db34fe7",
+      "name": "push_lead_retry",
+      "credentials": {
+        "redis": {
+          "id": "3vbZpmxpn6MpEUHP",
+          "name": "Redis account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Loop over all input items running through the node\nfor (const item of $input.all()) {\n  // Access the specific lead object path safely\n  const lead = item.json['current lead in flow'];\n\n  if (lead) {\n    // If retryCount doesn't exist or is null, default it to 0, then add 1\n    lead.retryCount = (lead.retryCount ?? 0) + 1;\n  }\n}\n\n// Return the modified items containing all original data + the updated field\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -176,
+        -288
+      ],
+      "id": "8d827beb-dfae-4468-887b-4d217585ac93",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "mode": "update",
+        "pineconeIndex": {
+          "__rl": true,
+          "value": "myindex",
+          "mode": "list",
+          "cachedResultName": "myindex"
+        },
+        "id": "id"
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1.3,
+      "position": [
+        -1776,
+        -336
+      ],
+      "id": "e2553904-8a24-4456-9570-b0e0e8be4134",
+      "name": "Pinecone Vector Store1",
+      "credentials": {
+        "pineconeApi": {
+          "id": "5cBaRWRCWfdUqaAW",
+          "name": "Pinecone account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "nomic-embed-text:latest"
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOllama",
+      "typeVersion": 1,
+      "position": [
+        -1920,
+        -80
+      ],
+      "id": "45935339-96ae-4769-90d8-b08339944686",
+      "name": "Embeddings Ollama1",
+      "credentials": {
+        "ollamaApi": {
+          "id": "ylNWveQw3edvA6cR",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "7ca888a0-4e32-4e17-8884-3fd6d524c0e0",
+              "leftValue": "={{ $workflow.name }}",
+              "rightValue": "leads",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": "",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -2528,
+        -1168
+      ],
+      "id": "96635665-7af2-4aae-99ee-eba7b064e762",
+      "name": "If3"
+    },
+    {
+      "parameters": {
+        "sendTo": "nikhildagar8822@gmail.com",
+        "subject": "error in workflow",
+        "emailType": "text",
+        "message": "your leads error got an error , check and fix it.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -2224,
+        -1232
+      ],
+      "id": "dcd99b32-0939-464a-a3f7-1595ec13d109",
+      "name": "Send a message1",
+      "webhookId": "eaf52ddb-f236-4d72-86e9-6c303a62758b",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "iAQhR2gsMEsS39VR",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "parse_agent_response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Ollama": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Pinecone Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pinecone Vector Store": {
+      "main": [
+        []
+      ],
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive Trigger": {
+      "main": [
+        [
+          {
+            "node": "Download file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Append or update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "If2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Pinecone Vector Store1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download file": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "get_waiting_status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "pop_lead": {
+      "main": [
+        [
+          {
+            "node": "does_list_has_data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_waiting_status": {
+      "main": [
+        [
+          {
+            "node": "waiting_status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "waiting_status": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "pop_lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "does_list_has_data": {
+      "main": [
+        [
+          {
+            "node": "set_waiting",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "push_lead": {
+      "main": [
+        []
+      ]
+    },
+    "parse_agent_response": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "push_lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "unset_waiting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append or update row in sheet": {
+      "main": [
+        [
+          {
+            "node": "unset_waiting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "set_waiting": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If2": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "push_lead_retry": {
+      "main": [
+        [
+          {
+            "node": "unset_waiting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "push_lead_retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Ollama1": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Pinecone Vector Store1",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "If3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If3": {
+      "main": [
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "86592946-a732-425b-a2ff-50864bffb610",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "01f2f8e4ffe4d130e03ef267969c4e87c2eec665dc820e1cc634300b64601d21"
+  },
+  "nodeGroups": [],
+  "id": "qJ618OoJWZjiMh4f",
+  "tags": []
+}
